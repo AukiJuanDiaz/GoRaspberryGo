@@ -5,7 +5,7 @@ import (
 	"log"
     "fmt"
 	"time"
-
+	"strconv"
 
 	// Added packages for implementing functionality
 	resty "gopkg.in/resty.v1"
@@ -46,8 +46,12 @@ type BikesPerStationData struct {
 
 type BikesPerStationList []BikesPerStationData
 
+
+
+
+
 type BikesPerStation struct {
-	Data BikesPerStationList
+	Data map[int]int
 	Timestamp time.Time
 }
 
@@ -85,16 +89,20 @@ func GetStadtRad() GetStadtRadData {
 }
 
 func GetBikesPerStation(input GetStadtRadData) BikesPerStation{
-	var bikesPerStation []BikesPerStationData
+
+	bikesPerStation := map[int]int{}
 
 	for _, element := range input.Data.Marker {
 		ElementStandort_ID := element.Hal2option.Standort_id
 		ElementAmountBikes := len(element.Hal2option.Bikelist)
-		ElementBikesPerStation := BikesPerStationData{
-			Standort_id: ElementStandort_ID,
-			AmountBikes: ElementAmountBikes,
+
+		i, err := strconv.Atoi(ElementStandort_ID)
+		if err != nil {
+			log.Fatal(err)
 		}
-		bikesPerStation = append(bikesPerStation, ElementBikesPerStation)
+
+		//Add amount of bikes in a map of standort_id
+		bikesPerStation[i] = ElementAmountBikes
 	}
 
 	result := BikesPerStation{
@@ -105,8 +113,36 @@ func GetBikesPerStation(input GetStadtRadData) BikesPerStation{
 	return result
 }
 
+func writeToSQLiteDB(input BikesPerStation) {
+     db, err := sql.Open("sqlite3", "./foo.db")
+     checkErr(err)
+
+     stmt, err := db.Prepare("INSERT INTO testTableTwoStations(s131881, s198077) values(?,?)")
+     checkErr(err)
+
+
+	 //Parse amount of bikes out of map
+     var s131881 int = input.Data[131881]
+     var s198077 int = input.Data[198077]
+
+	 /*
+	 fmt.Println(s131881)
+	 fmt.Println(s198077)
+	 */
+
+     res, err := stmt.Exec(s131881, s198077)
+     checkErr(err)
+}
+
+func checkErr(err error) {
+    if err != nil {
+        panic(err)
+    }
+}
+
 func main(){
 	rawdata := GetStadtRad()
 	stationStruct := GetBikesPerStation(rawdata)
 	fmt.Printf("%+v", stationStruct)
+	writeToSQLiteDB(stationStruct)
 }
