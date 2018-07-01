@@ -55,6 +55,7 @@ type BikesPerStation struct {
 	Timestamp time.Time
 }
 
+var DBConn *sql.DB
 
 func GetStadtRad() GetStadtRadData {
 
@@ -127,12 +128,9 @@ func ListAllStations(input GetStadtRadData) ListOfStations{
 }
 
 func AddStationToTable(StationID int){
-	 db, err := sql.Open("sqlite3", "./stadtRadTest2.db")
-     checkErr(err)
-     
      var columnName string = "s" + strconv.Itoa(StationID)
      var alterTable string = "ALTER TABLE testTableTwoStations ADD COLUMN " + columnName + " NUMERIC"
-     stmt, err := db.Prepare(alterTable)
+     stmt, err := DBConn.Prepare(alterTable)
      checkErr(err)
      
      res, err := stmt.Exec()
@@ -141,11 +139,23 @@ func AddStationToTable(StationID int){
      fmt.Println(res)
 }
 
-func writeToSQLiteDB(input BikesPerStation) {
-     db, err := sql.Open("sqlite3", "./stadtRadTest2.db")
-     checkErr(err)
+func AddColumnToTable(columnName string, columnType string, tableName string, pathToFile string){
 
-     stmt, err := db.Prepare("INSERT INTO testTableTwoStations(s131881, s198077) values(?,?)")
+     
+     var alterTable string = "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnType
+     stmt, err := DBConn.Prepare(alterTable)
+     checkErr(err)
+     
+     _, err2 := stmt.Exec()
+     checkErr(err2)
+} 
+
+func CreateStationToBikesTable(ListOfStations){
+	
+}
+
+func writeToSQLiteDB(input BikesPerStation) {
+     stmt, err := DBConn.Prepare("INSERT INTO testTableTwoStations(s131881, s198077) values(?,?)")
      checkErr(err)
 
 
@@ -170,12 +180,20 @@ func checkErr(err error) {
     }
 }
 
+func OpenDatabaseConnection(){
+	 var err error 
+	 DBConn, err = sql.Open("sqlite3", "./stadtRadTest2.db")
+     checkErr(err)
+}
+
 func main(){
+	OpenDatabaseConnection()
 	rawdata := GetStadtRad()
+	
 	stationStruct := GetBikesPerStation(rawdata)
 	fmt.Printf("%+v", stationStruct)
 	writeToSQLiteDB(stationStruct)
 	stationList := ListAllStations(rawdata)
 	fmt.Println(stationList)
-	AddStationToTable(stationList[5])
+	AddStationToTable(stationList[6])
 }
