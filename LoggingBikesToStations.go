@@ -1,4 +1,4 @@
-package main
+package stadtrad
 
 import (
 	"encoding/json"
@@ -13,48 +13,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// Minimal small types just for the status updates
-type Marker []MarkerItem
-
-type Bikelist []BikelistItem
-
-type BikelistItem struct {
-	Number string `json:"number"`
-	CanBeRented bool `json:"canBeRented"`
-}
-
-type Hal2option struct {
-	Standort_id string `json:"standort_id"`
-	Bikelist Bikelist `json:"bikelist"`
-}
-
-type MarkerItem struct {
-	Hal2option Hal2option `json:"hal2option"`
-}
-
-type GetStadtRadJSON struct {
-	Marker Marker `json:"marker"`
-}
-
-type GetStadtRadData struct {
-	Data GetStadtRadJSON
-	Timestamp time.Time
-}
-
-type BikesPerStationData struct {
-	Standort_id string
-	AmountBikes int
-}
-
-type BikesPerStationList []BikesPerStationData
-
-type ListOfStations []int
-
-type BikesPerStation struct {
-	Data map[int]int
-	Timestamp time.Time
-}
-
+// Database Pointer and RowCounter
 var DBConn *sql.DB
 var IDcurrRowBikesToStations int
 
@@ -128,55 +87,6 @@ func ListAllStations(input GetStadtRadData) ListOfStations{
 	return result
 }
 
-func AddStationToTable(StationID int){
-     var columnName string = "s" + strconv.Itoa(StationID)
-     var alterTable string = "ALTER TABLE bikeAmountToStations ADD COLUMN " + columnName + " NUMERIC"
-     stmt, err := DBConn.Prepare(alterTable)
-     checkErr(err)
-     
-     res, err := stmt.Exec()
-     checkErr(err)
-     
-     fmt.Println(res)
-}
-
-func AddColumnToTable(columnName string, columnType string, tableName string, pathToFile string){
-
-     
-     var alterTable string = "ALTER TABLE " + tableName + " ADD COLUMN " + columnName + " " + columnType
-     stmt, err := DBConn.Prepare(alterTable)
-     checkErr(err)
-     
-     _, err2 := stmt.Exec()
-     checkErr(err2)
-} 
-
-func CreateStationToBikesTable(list ListOfStations){
-	for _, elem := range list {
-		AddStationToTable(elem)
-	} 
-}
-
-func writeToSQLiteDB(input BikesPerStation) {
-     stmt, err := DBConn.Prepare("INSERT INTO testTableTwoStations(s131881, s198077) values(?,?)")
-     checkErr(err)
-
-
-	 //Parse amount of bikes out of map
-     var s131881 int = input.Data[131881]
-     var s198077 int = input.Data[198077]
-
-	 /*
-	 fmt.Println(s131881)
-	 fmt.Println(s198077)
-	 */
-
-     res, err := stmt.Exec(s131881, s198077)
-     checkErr(err)
-     
-     fmt.Println(res)
-}
-
 func logBikesPerStation(input BikesPerStation, list ListOfStations, rowid int) {
 	
 	// create the row by entering the first element
@@ -204,18 +114,6 @@ func logBikesPerStation(input BikesPerStation, list ListOfStations, rowid int) {
 	IDcurrRowBikesToStations = IDcurrRowBikesToStations + 1
 }
 
-func checkErr(err error) {
-    if err != nil {
-        panic(err)
-    }
-}
-
-func OpenDatabaseConnection(){
-	 var err error 
-	 DBConn, err = sql.Open("sqlite3", "./stadtRadDataVault.db")
-     checkErr(err)
-}
-
 func GetHighestIDInBikesToStations() int{
 	row := DBConn.QueryRow("SELECT MAX(id) FROM bikeAmountToStations")
 	
@@ -235,17 +133,19 @@ func GetHighestIDInBikesToStations() int{
 
 func main(){
 	OpenDatabaseConnection()
-	rawdata := GetStadtRad()
 	IDcurrRowBikesToStations = GetHighestIDInBikesToStations()
 	
-	bikesPerStationStruct := GetBikesPerStation(rawdata)
-	fmt.Printf("%+v", bikesPerStationStruct)
-	// writeToSQLiteDB(stationStruct)
-	stationList := ListAllStations(rawdata)
-	// fmt.Println(stationList)
-	
+	// Creating new columns in table  
 	//CreateStationToBikesTable(stationList)
 	
-	logBikesPerStation(bikesPerStationStruct, stationList, IDcurrRowBikesToStations) 
-	
+	// Repeat function calls every 10 seconds
+	for t := range time.NewTicker(10 * time.Second).C {
+			rawdata := GetStadtRad()
+			bikesPerStationStruct := GetBikesPerStation(rawdata)
+			stationList := ListAllStations(rawdata)
+			logBikesPerStation(bikesPerStationStruct, stationList, IDcurrRowBikesToStations) 
+			fmt.Println("Logging at time " + t.String() + "completed.")
+			// Print the rawdata to console
+			//fmt.Printf("%+v", bikesPerStationStruct)
+	}
 }
