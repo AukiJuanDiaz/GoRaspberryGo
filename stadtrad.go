@@ -6,9 +6,11 @@ import (
     "fmt"
 	"time"
 	"strconv"
+	"database/sql"
 
 	// Added packages for implementing functionality
 	resty "gopkg.in/resty.v1"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 // Minimal small types just for the status updates
@@ -114,7 +116,7 @@ func GetBikesPerStation(input GetStadtRadData) BikesPerStation{
 }
 
 func writeToSQLiteDB(input BikesPerStation) {
-     db, err := sql.Open("sqlite3", "./foo.db")
+     db, err := sql.Open("sqlite3", "./stadtRadTest2.db")
      checkErr(err)
 
      stmt, err := db.Prepare("INSERT INTO testTableTwoStations(s131881, s198077) values(?,?)")
@@ -132,6 +134,8 @@ func writeToSQLiteDB(input BikesPerStation) {
 
      res, err := stmt.Exec(s131881, s198077)
      checkErr(err)
+     
+     fmt.Println(res)
 }
 
 func checkErr(err error) {
