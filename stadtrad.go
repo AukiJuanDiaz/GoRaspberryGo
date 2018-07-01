@@ -48,9 +48,7 @@ type BikesPerStationData struct {
 
 type BikesPerStationList []BikesPerStationData
 
-
-
-
+type ListOfStations []int
 
 type BikesPerStation struct {
 	Data map[int]int
@@ -115,6 +113,34 @@ func GetBikesPerStation(input GetStadtRadData) BikesPerStation{
 	return result
 }
 
+func ListAllStations(input GetStadtRadData) ListOfStations{
+	var result []int
+	for _, element := range input.Data.Marker {
+		ElementStandort_ID := element.Hal2option.Standort_id
+		i, err := strconv.Atoi(ElementStandort_ID)
+		if err != nil {
+			log.Fatal(err)
+		}
+		result = append(result, i)
+	}
+	return result
+}
+
+func AddStationToTable(StationID int){
+	 db, err := sql.Open("sqlite3", "./stadtRadTest2.db")
+     checkErr(err)
+     
+     var columnName string = "s" + strconv.Itoa(StationID)
+     var alterTable string = "ALTER TABLE testTableTwoStations ADD COLUMN " + columnName + " NUMERIC"
+     stmt, err := db.Prepare(alterTable)
+     checkErr(err)
+     
+     res, err := stmt.Exec()
+     checkErr(err)
+     
+     fmt.Println(res)
+}
+
 func writeToSQLiteDB(input BikesPerStation) {
      db, err := sql.Open("sqlite3", "./stadtRadTest2.db")
      checkErr(err)
@@ -149,4 +175,7 @@ func main(){
 	stationStruct := GetBikesPerStation(rawdata)
 	fmt.Printf("%+v", stationStruct)
 	writeToSQLiteDB(stationStruct)
+	stationList := ListAllStations(rawdata)
+	fmt.Println(stationList)
+	AddStationToTable(stationList[5])
 }
