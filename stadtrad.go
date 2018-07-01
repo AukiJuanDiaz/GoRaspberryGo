@@ -56,6 +56,7 @@ type BikesPerStation struct {
 }
 
 var DBConn *sql.DB
+var IDcurrRowBikesToStations int
 
 func GetStadtRad() GetStadtRadData {
 
@@ -129,7 +130,7 @@ func ListAllStations(input GetStadtRadData) ListOfStations{
 
 func AddStationToTable(StationID int){
      var columnName string = "s" + strconv.Itoa(StationID)
-     var alterTable string = "ALTER TABLE testTableTwoStations ADD COLUMN " + columnName + " NUMERIC"
+     var alterTable string = "ALTER TABLE bikeAmountToStations ADD COLUMN " + columnName + " NUMERIC"
      stmt, err := DBConn.Prepare(alterTable)
      checkErr(err)
      
@@ -150,8 +151,10 @@ func AddColumnToTable(columnName string, columnType string, tableName string, pa
      checkErr(err2)
 } 
 
-func CreateStationToBikesTable(ListOfStations){
-	
+func CreateStationToBikesTable(list ListOfStations){
+	for _, elem := range list {
+		AddStationToTable(elem)
+	} 
 }
 
 func writeToSQLiteDB(input BikesPerStation) {
@@ -174,6 +177,33 @@ func writeToSQLiteDB(input BikesPerStation) {
      fmt.Println(res)
 }
 
+func logBikesPerStation(input BikesPerStation, list ListOfStations, rowid int) {
+	
+	// create the row by entering the first element
+	rowid = rowid + 1
+	var firstColumnName string = "s" + strconv.Itoa(list[0])
+	stmt, err := DBConn.Prepare("INSERT INTO bikeAmountToStations(id, "+ firstColumnName +") values(?, ?)")
+	checkErr(err)
+	var bikesAtStation int = input.Data[list[0]]
+	_, err2 := stmt.Exec(rowid, bikesAtStation)
+	checkErr(err2)
+	list = list[1:]
+	
+	// update all the other columns
+	for _,elem := range list{
+		var columnName string = "s" + strconv.Itoa(elem)
+		stmt, err := DBConn.Prepare("UPDATE bikeAmountToStations SET " + columnName + " = ? WHERE id = ?")
+		checkErr(err)
+		
+		var bikesAtStation int = input.Data[elem]
+		
+		_, err3 := stmt.Exec(bikesAtStation, rowid)
+		checkErr(err3)
+	}
+	
+	IDcurrRowBikesToStations = IDcurrRowBikesToStations + 1
+}
+
 func checkErr(err error) {
     if err != nil {
         panic(err)
@@ -182,18 +212,40 @@ func checkErr(err error) {
 
 func OpenDatabaseConnection(){
 	 var err error 
-	 DBConn, err = sql.Open("sqlite3", "./stadtRadTest2.db")
+	 DBConn, err = sql.Open("sqlite3", "./stadtRadDataVault.db")
      checkErr(err)
+}
+
+func GetHighestIDInBikesToStations() int{
+	row := DBConn.QueryRow("SELECT MAX(id) FROM bikeAmountToStations")
+	
+	var result int
+	err := row.Scan(&result)
+	switch err {
+	case sql.ErrNoRows:
+		fmt.Println("No rows were returned!")
+	case nil:
+		// Everything alright
+	default:
+		checkErr(err)
+	}
+	
+	return result
 }
 
 func main(){
 	OpenDatabaseConnection()
 	rawdata := GetStadtRad()
+	IDcurrRowBikesToStations = GetHighestIDInBikesToStations()
 	
-	stationStruct := GetBikesPerStation(rawdata)
-	fmt.Printf("%+v", stationStruct)
-	writeToSQLiteDB(stationStruct)
+	bikesPerStationStruct := GetBikesPerStation(rawdata)
+	fmt.Printf("%+v", bikesPerStationStruct)
+	// writeToSQLiteDB(stationStruct)
 	stationList := ListAllStations(rawdata)
-	fmt.Println(stationList)
-	AddStationToTable(stationList[6])
+	// fmt.Println(stationList)
+	
+	//CreateStationToBikesTable(stationList)
+	
+	logBikesPerStation(bikesPerStationStruct, stationList, IDcurrRowBikesToStations) 
+	
 }
